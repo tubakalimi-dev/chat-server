@@ -38,7 +38,7 @@ app.get('/', (req, res) => {
 // Socket.IO connection handling
 io.on('connection', (socket) => {
   console.log('✅ New user connected:', socket.id);
-
+  
   // Handle user signin
   socket.on('signin', (userId) => {
     socket.userId = userId;
@@ -46,28 +46,28 @@ io.on('connection', (socket) => {
     console.log('📝 User signed in:', userId);
     console.log('👥 Total users:', connectedUsers.size);
   });
-
+  
   // Handle incoming messages
-  s// Handle incoming messages
-socket.on('send_message', (data) => {
-  console.log('📨 Message received:', {
-    from: data.sender,
-    to: data.room,
-    content: data.content,
-    time: data.time
+  socket.on('send_message', (data) => {
+    console.log('📨 Message received:', {
+      from: data.sender,
+      to: data.room,
+      content: data.content,
+      time: data.time
+    });
+    
+    // Broadcast message to all clients EXCEPT the sender
+    socket.broadcast.emit('receive_message', {
+      content: data.content,
+      message: data.content,
+      sender: data.sender,
+      time: data.time,
+      messageId: data.messageId
+    });
+    
+    console.log('✅ Message broadcasted');
   });
   
-  // Broadcast message to all clients EXCEPT the sender
-  socket.broadcast.emit('receive_message', {  // ✅ Changed io.emit to socket.broadcast.emit
-    content: data.content,
-    message: data.content,
-    sender: data.sender,
-    time: data.time,
-    messageId: data.messageId
-  });
-  
-  console.log('✅ Message broadcasted');
-});
   // Handle typing indicator
   socket.on('typing', () => {
     socket.broadcast.emit('user_typing', {
@@ -75,7 +75,7 @@ socket.on('send_message', (data) => {
       isTyping: true
     });
   });
-
+  
   // Handle disconnect
   socket.on('disconnect', () => {
     if (socket.userId) {
