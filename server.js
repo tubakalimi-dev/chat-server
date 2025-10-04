@@ -16,21 +16,19 @@ const server = http.createServer(app);
 // Initialize Socket.IO with CORS
 const io = socketIo(server, {
   cors: {
-    origin: "*", // Allow all origins (change in production)
+    origin: "*", // Allow all origins (change for production)
     methods: ["GET", "POST"],
     credentials: true
   },
   transports: ['websocket', 'polling']
 });
 
-const PORT = process.env.PORT || 5000;
-server.listen(PORT, () => {
 // Store connected users
 const connectedUsers = new Map();
 
 // Health check endpoint
 app.get('/', (req, res) => {
-  res.json({ 
+  res.json({
     status: 'Server is running',
     timestamp: new Date().toISOString(),
     connectedUsers: connectedUsers.size
@@ -71,7 +69,7 @@ io.on('connection', (socket) => {
   });
 
   // Handle typing indicator
-  socket.on('typing', (data) => {
+  socket.on('typing', () => {
     socket.broadcast.emit('user_typing', {
       userId: socket.userId,
       isTyping: true
@@ -88,7 +86,8 @@ io.on('connection', (socket) => {
   });
 });
 
-// Start server
+// Start server (only once)
+const PORT = process.env.PORT || 5000;
 server.listen(PORT, () => {
   console.log('🚀 Server started successfully!');
   console.log(`📡 Listening on port ${PORT}`);
