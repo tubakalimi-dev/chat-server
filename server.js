@@ -67,7 +67,14 @@ io.on('connection', (socket) => {
     
     console.log('✅ Message broadcasted');
   });
-  
+
+  // Show me this part of your client code:
+
+socket.on('receive_message', (data) => {
+  // What's happening here?
+  console.log('Received message:', data);
+  // How are you displaying it?
+});
   // Handle typing indicator
   socket.on('typing', () => {
     socket.broadcast.emit('user_typing', {
