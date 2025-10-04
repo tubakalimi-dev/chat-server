@@ -48,26 +48,26 @@ io.on('connection', (socket) => {
   });
 
   // Handle incoming messages
-  socket.on('send_message', (data) => {
-    console.log('📨 Message received:', {
-      from: data.sender,
-      to: data.room,
-      content: data.content,
-      time: data.time
-    });
-
-    // Broadcast message to all clients
-    io.emit('receive_message', {
-      content: data.content,
-      message: data.content,
-      sender: data.sender,
-      time: data.time,
-      messageId: data.messageId
-    });
-
-    console.log('✅ Message broadcasted');
+  s// Handle incoming messages
+socket.on('send_message', (data) => {
+  console.log('📨 Message received:', {
+    from: data.sender,
+    to: data.room,
+    content: data.content,
+    time: data.time
   });
-
+  
+  // Broadcast message to all clients EXCEPT the sender
+  socket.broadcast.emit('receive_message', {  // ✅ Changed io.emit to socket.broadcast.emit
+    content: data.content,
+    message: data.content,
+    sender: data.sender,
+    time: data.time,
+    messageId: data.messageId
+  });
+  
+  console.log('✅ Message broadcasted');
+});
   // Handle typing indicator
   socket.on('typing', () => {
     socket.broadcast.emit('user_typing', {
