@@ -2,6 +2,7 @@ const express = require('express');
 const http = require('http');
 const socketIo = require('socket.io');
 const cors = require('cors');
+const mongoose = require('mongoose');
 require('dotenv').config();
 
 const app = express();
@@ -10,13 +11,29 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+// MongoDB Connection
+mongoose.connect(process.env.MONGODB_URI)
+  .then(() => console.log('✅ MongoDB Connected'))
+  .catch(err => {
+    console.error('❌ MongoDB Connection Error:', err);
+    process.exit(1);
+  });
+
+// Import routes
+const authRoutes = require('./routes/auth');
+const statusRoutes = require('./routes/status');
+
+// Use routes
+app.use('/api/auth', authRoutes);
+app.use('/api/status', statusRoutes);
+
 // Create HTTP server
 const server = http.createServer(app);
 
 // Initialize Socket.IO with CORS
 const io = socketIo(server, {
   cors: {
-    origin: "*", // Allow all origins (change for production)
+    origin: "*",
     methods: ["GET", "POST"],
     credentials: true
   },
@@ -45,6 +62,13 @@ io.on('connection', (socket) => {
     connectedUsers.set(userId, socket.id);
     console.log('📝 User signed in:', userId);
     console.log('👥 Total users:', connectedUsers.size);
+    
+    // Broadcast user online status
+    io.emit('user_status_change', {
+      userId: userId,
+      status: 'online',
+      timestamp: new Date().toISOString()
+    });
   });
   
   // Handle incoming messages
@@ -68,32 +92,49 @@ io.on('connection', (socket) => {
     console.log('✅ Message broadcasted');
   });
 
-  // Show me this part of your client code:
-
-socket.on('receive_message', (data) => {
-  // What's happening here?
-  console.log('Received message:', data);
-  // How are you displaying it?
-});
   // Handle typing indicator
-  socket.on('typing', () => {
+  socket.on('typing', (data) => {
     socket.broadcast.emit('user_typing', {
-      userId: socket.userId,
+      userId: socket.userId || data.userId,
       isTyping: true
     });
   });
   
+  // Handle stop typing
+  socket.on('stop_typing', (data) => {
+    socket.broadcast.emit('user_typing', {
+      userId: socket.userId || data.userId,
+      isTyping: false
+    });
+  });
+
+  // Handle status change
+  socket.on('status_change', (data) => {
+    io.emit('user_status_change', {
+      userId: data.userId,
+      status: data.status,
+      timestamp: new Date().toISOString()
+    });
+  });
+
   // Handle disconnect
   socket.on('disconnect', () => {
     if (socket.userId) {
       connectedUsers.delete(socket.userId);
       console.log('❌ User disconnected:', socket.userId);
       console.log('👥 Remaining users:', connectedUsers.size);
+      
+      // Broadcast user offline status
+      io.emit('user_status_change', {
+        userId: socket.userId,
+        status: 'offline',
+        timestamp: new Date().toISOString()
+      });
     }
   });
 });
 
-// Start server (only once)
+// Start server
 const PORT = process.env.PORT || 5000;
 server.listen(PORT, () => {
   console.log('🚀 Server started successfully!');
@@ -105,6 +146,7 @@ server.listen(PORT, () => {
 process.on('SIGTERM', () => {
   console.log('👋 SIGTERM received, shutting down gracefully');
   server.close(() => {
+    mongoose.connection.close();
     console.log('✅ Server closed');
     process.exit(0);
   });
