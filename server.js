@@ -55,7 +55,7 @@ app.get('/', (req, res) => {
 // Socket.IO connection handling
 io.on('connection', (socket) => {
   console.log('✅ New user connected:', socket.id);
-  
+
   // Handle user signin
   socket.on('signin', (userId) => {
     socket.userId = userId;
@@ -70,7 +70,7 @@ io.on('connection', (socket) => {
       timestamp: new Date().toISOString()
     });
   });
-  
+
   // Handle incoming messages
   socket.on('send_message', (data) => {
     console.log('📨 Message received:', {
@@ -79,29 +79,18 @@ io.on('connection', (socket) => {
       content: data.content,
       time: data.time
     });
-    
-    // Broadcast message to all clients EXCEPT the sender
-    socket.broadcast.emit('receive_message', {
+
+    // Broadcast message to all clients
+    io.emit('receive_message', {
       content: data.content,
       message: data.content,
       sender: data.sender,
       time: data.time,
       messageId: data.messageId
     });
-<<<<<<< HEAD
-    
-=======
->>>>>>> 99f0f37 (Added new files)
     console.log('✅ Message broadcasted');
   });
 
-  // Show me this part of your client code:
-
-socket.on('receive_message', (data) => {
-  // What's happening here?
-  console.log('Received message:', data);
-  // How are you displaying it?
-});
   // Handle typing indicator
   socket.on('typing', (data) => {
     socket.broadcast.emit('user_typing', {
@@ -109,9 +98,6 @@ socket.on('receive_message', (data) => {
       isTyping: true
     });
   });
-<<<<<<< HEAD
-  
-=======
 
   // Handle stop typing
   socket.on('stop_typing', (data) => {
@@ -130,7 +116,6 @@ socket.on('receive_message', (data) => {
     });
   });
 
->>>>>>> 99f0f37 (Added new files)
   // Handle disconnect
   socket.on('disconnect', () => {
     if (socket.userId) {
