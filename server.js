@@ -56,14 +56,12 @@ app.get('/', (req, res) => {
 io.on('connection', (socket) => {
   console.log('✅ New user connected:', socket.id);
 
-  // Handle user signin
   socket.on('signin', (userId) => {
     socket.userId = userId;
     connectedUsers.set(userId, socket.id);
     console.log('📝 User signed in:', userId);
     console.log('👥 Total users:', connectedUsers.size);
     
-    // Broadcast user online status
     io.emit('user_status_change', {
       userId: userId,
       status: 'online',
@@ -71,7 +69,6 @@ io.on('connection', (socket) => {
     });
   });
 
-  // Handle incoming messages
   socket.on('send_message', (data) => {
     console.log('📨 Message received:', {
       from: data.sender,
@@ -80,7 +77,6 @@ io.on('connection', (socket) => {
       time: data.time
     });
 
-    // Broadcast message to all clients
     io.emit('receive_message', {
       content: data.content,
       message: data.content,
@@ -91,7 +87,6 @@ io.on('connection', (socket) => {
     console.log('✅ Message broadcasted');
   });
 
-  // Handle typing indicator
   socket.on('typing', (data) => {
     socket.broadcast.emit('user_typing', {
       userId: socket.userId || data.userId,
@@ -99,7 +94,6 @@ io.on('connection', (socket) => {
     });
   });
 
-  // Handle stop typing
   socket.on('stop_typing', (data) => {
     socket.broadcast.emit('user_typing', {
       userId: socket.userId || data.userId,
@@ -107,7 +101,6 @@ io.on('connection', (socket) => {
     });
   });
 
-  // Handle status change
   socket.on('status_change', (data) => {
     io.emit('user_status_change', {
       userId: data.userId,
@@ -116,14 +109,12 @@ io.on('connection', (socket) => {
     });
   });
 
-  // Handle disconnect
   socket.on('disconnect', () => {
     if (socket.userId) {
       connectedUsers.delete(socket.userId);
       console.log('❌ User disconnected:', socket.userId);
       console.log('👥 Remaining users:', connectedUsers.size);
       
-      // Broadcast user offline status
       io.emit('user_status_change', {
         userId: socket.userId,
         status: 'offline',
