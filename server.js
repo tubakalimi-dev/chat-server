@@ -88,10 +88,20 @@ io.on('connection', (socket) => {
       time: data.time,
       messageId: data.messageId
     });
+<<<<<<< HEAD
     
+=======
+>>>>>>> 99f0f37 (Added new files)
     console.log('✅ Message broadcasted');
   });
 
+  // Show me this part of your client code:
+
+socket.on('receive_message', (data) => {
+  // What's happening here?
+  console.log('Received message:', data);
+  // How are you displaying it?
+});
   // Handle typing indicator
   socket.on('typing', (data) => {
     socket.broadcast.emit('user_typing', {
@@ -99,7 +109,10 @@ io.on('connection', (socket) => {
       isTyping: true
     });
   });
+<<<<<<< HEAD
   
+=======
+
   // Handle stop typing
   socket.on('stop_typing', (data) => {
     socket.broadcast.emit('user_typing', {
@@ -117,6 +130,7 @@ io.on('connection', (socket) => {
     });
   });
 
+>>>>>>> 99f0f37 (Added new files)
   // Handle disconnect
   socket.on('disconnect', () => {
     if (socket.userId) {
