@@ -12,7 +12,7 @@ app.use(cors());
 app.use(express.json());
 
 // MongoDB Connection
-mongoose.connect(process.env.MONGO_URI)
+mongoose.connect(process.env.MONGODB_URI)
   .then(() => console.log('✅ MongoDB Connected'))
   .catch(err => {
     console.error('❌ MongoDB Connection Error:', err);
@@ -22,7 +22,10 @@ mongoose.connect(process.env.MONGO_URI)
 // Import routes
 const authRoutes = require('./routes/auth');
 const statusRoutes = require('./routes/status');
+const adminRoutes = require('./routes/admin'); // or wherever you put the code above
 
+// Register the routes (add this with your other routes)
+app.use('/api/admin', adminRoutes);
 // Use routes
 app.use('/api/auth', authRoutes);
 app.use('/api/status', statusRoutes);
