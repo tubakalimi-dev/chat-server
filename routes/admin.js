@@ -1,17 +1,37 @@
-// Add this to your status routes file (routes/status.js)
-// OR create a separate admin routes file (routes/admin.js)
-
 const express = require('express');
 const router = express.Router();
 const User = require('../models/User');
 const authMiddleware = require('../middleware/auth');
-const adminMiddleware = require('../middleware/admin');
+
+// Admin check helper function
+const checkAdmin = (req, res) => {
+  if (!req.user) {
+    res.status(401).json({ 
+      success: false, 
+      message: 'Authentication required' 
+    });
+    return false;
+  }
+  
+  if (req.user.role !== 'admin') {
+    res.status(403).json({ 
+      success: false, 
+      message: 'Access denied. Admin privileges required.' 
+    });
+    return false;
+  }
+  
+  return true;
+};
 
 // @desc    Admin: Update any user's status
 // @route   PUT /api/admin/user/:userId/status
 // @access  Admin only
-router.put('/user/:userId/status', authMiddleware, adminMiddleware, async (req, res) => {
+router.put('/user/:userId/status', authMiddleware, async (req, res) => {
   try {
+    // Check if user is admin
+    if (!checkAdmin(req, res)) return;
+
     const { userId } = req.params;
     const { status } = req.body;
 
@@ -61,8 +81,11 @@ router.put('/user/:userId/status', authMiddleware, adminMiddleware, async (req, 
 // @desc    Admin: Get user details with status
 // @route   GET /api/admin/user/:userId
 // @access  Admin only
-router.get('/user/:userId', authMiddleware, adminMiddleware, async (req, res) => {
+router.get('/user/:userId', authMiddleware, async (req, res) => {
   try {
+    // Check if user is admin
+    if (!checkAdmin(req, res)) return;
+
     const { userId } = req.params;
 
     const user = await User.findById(userId).select('-password');
@@ -98,8 +121,11 @@ router.get('/user/:userId', authMiddleware, adminMiddleware, async (req, res) =>
 // @desc    Admin: Bulk update multiple users' status
 // @route   PUT /api/admin/users/status/bulk
 // @access  Admin only
-router.put('/users/status/bulk', authMiddleware, adminMiddleware, async (req, res) => {
+router.put('/users/status/bulk', authMiddleware, async (req, res) => {
   try {
+    // Check if user is admin
+    if (!checkAdmin(req, res)) return;
+
     const { userIds, status } = req.body;
 
     // Validate status
