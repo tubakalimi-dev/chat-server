@@ -3,48 +3,47 @@ const User = require('../models/User');
 
 const authMiddleware = async (req, res, next) => {
   try {
-    // Get token from header
+    // Get token from Authorization header
     const token = req.header('Authorization')?.replace('Bearer ', '');
 
     if (!token) {
-      return res.status(401).json({ 
-        success: false, 
-        message: 'No token provided, authorization denied' 
+      return res.status(401).json({
+        success: false,
+        message: 'No token provided, authorization denied'
       });
     }
 
     // Verify token
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-    // Find user
+    // Find and validate user
     const user = await User.findById(decoded.userId).select('-password');
-
     if (!user) {
-      return res.status(401).json({ 
-        success: false, 
-        message: 'User not found' 
+      return res.status(401).json({
+        success: false,
+        message: 'User not found'
       });
     }
 
-    // Attach user to request
     req.user = user;
     next();
   } catch (error) {
     if (error.name === 'JsonWebTokenError') {
-      return res.status(401).json({ 
-        success: false, 
-        message: 'Invalid token' 
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid token'
       });
     }
     if (error.name === 'TokenExpiredError') {
-      return res.status(401).json({ 
-        success: false, 
-        message: 'Token expired' 
+      return res.status(401).json({
+        success: false,
+        message: 'Token expired'
       });
     }
-    res.status(500).json({ 
-      success: false, 
-      message: 'Server error' 
+    console.error('Authentication error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Server error verifying token'
     });
   }
 };
