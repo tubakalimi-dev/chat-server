@@ -3,13 +3,24 @@ const http = require('http');
 const socketIo = require('socket.io');
 const cors = require('cors');
 const mongoose = require('mongoose');
+const fs = require('fs');
 require('dotenv').config();
 
 const app = express();
 
+// ===== Create uploads folder if it doesn't exist =====
+if (!fs.existsSync('uploads')) {
+  fs.mkdirSync('uploads');
+  console.log('✅ Created uploads folder');
+}
+
 // ===== Middleware =====
 app.use(cors());
 app.use(express.json());
+app.use(express.urlencoded({ limit: '50mb', extended: true }));
+
+// ===== Serve static files for uploads =====
+app.use('/uploads', express.static('uploads'));
 
 // ===== MongoDB Connection =====
 mongoose.connect(process.env.MONGO_URI)
@@ -22,10 +33,12 @@ mongoose.connect(process.env.MONGO_URI)
 // ===== Import Routes =====
 const authRoutes = require('./routes/auth');
 const statusRoutes = require('./routes/status');
+const statusUploadRoutes = require('./routes/statusroute');
 const adminRoutes = require('./routes/admin');
 
 // ===== Register Routes =====
 app.use('/api/auth', authRoutes);
+app.use('/api/status/upload', statusUploadRoutes);
 app.use('/api/status', statusRoutes);
 app.use('/api/admin', adminRoutes);
 
@@ -64,7 +77,6 @@ io.on('connection', (socket) => {
     connectedUsers.set(userId, socket.id);
     console.log('📝 User signed in:', userId);
     console.log('👥 Total users:', connectedUsers.size);
-
     io.emit('user_status_change', {
       userId,
       status: 'online',
@@ -80,7 +92,6 @@ io.on('connection', (socket) => {
       content: data.content,
       time: data.time
     });
-
     io.emit('receive_message', {
       content: data.content,
       message: data.content,
@@ -121,13 +132,21 @@ io.on('connection', (socket) => {
       connectedUsers.delete(socket.userId);
       console.log('❌ User disconnected:', socket.userId);
       console.log('👥 Remaining users:', connectedUsers.size);
-
       io.emit('user_status_change', {
         userId: socket.userId,
         status: 'offline',
         timestamp: new Date().toISOString()
       });
     }
+  });
+});
+
+// ===== Global Error Handler =====
+app.use((err, req, res, next) => {
+  console.error('❌ Error:', err.message);
+  res.status(err.status || 500).json({
+    success: false,
+    message: err.message || 'Internal Server Error'
   });
 });
 
