@@ -1,44 +1,69 @@
 const express = require('express');
-const router = express.Router();
-const upload = require('../middleware/upload');
+const multer = require('multer');
+const path = require('path');
+const auth = require('../middleware/auth');
 const Status = require('../models/Status');
-const { verifyToken } = require('../middleware/authMiddleware'); // assuming you have JWT auth
 
-// Upload a new status
-router.post('/upload', verifyToken, upload.single('media'), async (req, res) => {
+const router = express.Router();
+
+// ===== MULTER STORAGE SETUP =====
+const storage = multer.diskStorage({
+  destination: 'uploads/',
+  filename: (req, file, cb) => {
+    cb(null, `status_${Date.now()}${path.extname(file.originalname)}`);
+  }
+});
+const upload = multer({ storage });
+
+// ===== POST /api/status/upload =====
+// Upload a new photo/video status
+router.post('/upload', auth, upload.single('media'), async (req, res) => {
   try {
+    if (!req.file)
+      return res.status(400).json({ success: false, message: 'No file uploaded' });
+
+    const mediaType = req.file.mimetype.startsWith('video') ? 'video' : 'image';
+
     const newStatus = await Status.create({
-      userId: req.user.id,
+      userId: req.user._id,
       mediaUrl: `/uploads/${req.file.filename}`,
-      mediaType: req.file.mimetype.startsWith('video') ? 'video' : 'image'
+      mediaType
     });
-    res.status(201).json({ success: true, status: newStatus });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
+
+    res.json({
+      success: true,
+      message: 'Status uploaded successfully',
+      status: newStatus
+    });
+  } catch (error) {
+    console.error('Upload error:', error);
+    res.status(500).json({ success: false, message: 'Error uploading status' });
   }
 });
 
-// Get all active statuses
-router.get('/', verifyToken, async (req, res) => {
+// ===== GET /api/status =====
+// Fetch all current (non-expired) statuses
+router.get('/', auth, async (req, res) => {
   try {
     const statuses = await Status.find()
-      .populate('userId', 'name icon')
+      .populate('userId', 'name email')
       .sort({ createdAt: -1 });
-    res.json(statuses);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
 
-// Mark a status as viewed
-router.post('/view/:id', verifyToken, async (req, res) => {
-  try {
-    await Status.findByIdAndUpdate(req.params.id, {
-      $addToSet: { viewers: req.user.id }
+    res.json({
+      success: true,
+      statuses: statuses.map(s => ({
+        _id: s._id,
+        userId: s.userId._id,
+        userName: s.userId.name,
+        mediaUrl: s.mediaUrl,
+        mediaType: s.mediaType,
+        createdAt: s.createdAt,
+        expiresAt: s.expiresAt,
+        viewedBy: s.viewedBy
+      }))
     });
-    res.json({ success: true });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Error fetching statuses' });
   }
 });
 

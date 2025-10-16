@@ -7,12 +7,11 @@ require('dotenv').config();
 
 const app = express();
 
-
-// Middleware
+// ===== Middleware =====
 app.use(cors());
 app.use(express.json());
 
-// MongoDB Connection
+// ===== MongoDB Connection =====
 mongoose.connect(process.env.MONGO_URI)
   .then(() => console.log('✅ MongoDB Connected'))
   .catch(err => {
@@ -20,27 +19,29 @@ mongoose.connect(process.env.MONGO_URI)
     process.exit(1);
   });
 
-// Import routes
+// ===== Import Routes =====
 const authRoutes = require('./routes/auth');
 const statusRoutes = require('./routes/status');
-const adminRoutes = require('./routes/admin'); // or wherever you put the code above
-const path = require('path');
-const statusRoutes = require('./routes/statusRoutes');
+const adminRoutes = require('./routes/admin');
 
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
-app.use('/api/status', statusRoutes);
-
-
-// Register the routes (add this with your other routes)
-app.use('/api/admin', adminRoutes);
-// Use routes
+// ===== Register Routes =====
 app.use('/api/auth', authRoutes);
 app.use('/api/status', statusRoutes);
+app.use('/api/admin', adminRoutes);
 
-// Create HTTP server
+// ===== Health Check Endpoint =====
+app.get('/', (req, res) => {
+  res.json({
+    status: 'Server is running',
+    timestamp: new Date().toISOString(),
+    connectedUsers: connectedUsers.size
+  });
+});
+
+// ===== Create HTTP Server =====
 const server = http.createServer(app);
 
-// Initialize Socket.IO with CORS
+// ===== Initialize Socket.IO =====
 const io = socketIo(server, {
   cors: {
     origin: "*",
@@ -50,35 +51,28 @@ const io = socketIo(server, {
   transports: ['websocket', 'polling']
 });
 
-// Store connected users
+// ===== Store Connected Users =====
 const connectedUsers = new Map();
 
-// Health check endpoint
-app.get('/', (req, res) => {
-  res.json({
-    status: 'Server is running',
-    timestamp: new Date().toISOString(),
-    connectedUsers: connectedUsers.size
-  });
-});
-
-// Socket.IO connection handling
+// ===== Socket.IO Handlers =====
 io.on('connection', (socket) => {
   console.log('✅ New user connected:', socket.id);
 
+  // When a user signs in
   socket.on('signin', (userId) => {
     socket.userId = userId;
     connectedUsers.set(userId, socket.id);
     console.log('📝 User signed in:', userId);
     console.log('👥 Total users:', connectedUsers.size);
-    
+
     io.emit('user_status_change', {
-      userId: userId,
+      userId,
       status: 'online',
       timestamp: new Date().toISOString()
     });
   });
 
+  // When a message is sent
   socket.on('send_message', (data) => {
     console.log('📨 Message received:', {
       from: data.sender,
@@ -97,6 +91,7 @@ io.on('connection', (socket) => {
     console.log('✅ Message broadcasted');
   });
 
+  // Typing events
   socket.on('typing', (data) => {
     socket.broadcast.emit('user_typing', {
       userId: socket.userId || data.userId,
@@ -111,6 +106,7 @@ io.on('connection', (socket) => {
     });
   });
 
+  // Manual status change
   socket.on('status_change', (data) => {
     io.emit('user_status_change', {
       userId: data.userId,
@@ -119,12 +115,13 @@ io.on('connection', (socket) => {
     });
   });
 
+  // Handle user disconnect
   socket.on('disconnect', () => {
     if (socket.userId) {
       connectedUsers.delete(socket.userId);
       console.log('❌ User disconnected:', socket.userId);
       console.log('👥 Remaining users:', connectedUsers.size);
-      
+
       io.emit('user_status_change', {
         userId: socket.userId,
         status: 'offline',
@@ -134,7 +131,7 @@ io.on('connection', (socket) => {
   });
 });
 
-// Start server
+// ===== Start Server =====
 const PORT = process.env.PORT || 5000;
 server.listen(PORT, () => {
   console.log('🚀 Server started successfully!');
@@ -142,7 +139,7 @@ server.listen(PORT, () => {
   console.log(`🌐 Environment: ${process.env.NODE_ENV || 'development'}`);
 });
 
-// Graceful shutdown
+// ===== Graceful Shutdown =====
 process.on('SIGTERM', () => {
   console.log('👋 SIGTERM received, shutting down gracefully');
   server.close(() => {

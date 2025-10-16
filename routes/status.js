@@ -3,55 +3,59 @@ const router = express.Router();
 const User = require('../models/User');
 const authMiddleware = require('../middleware/auth');
 
+// ===========================================
 // @desc    Update user status
 // @route   PUT /api/status
+// ===========================================
 router.put('/', authMiddleware, async (req, res) => {
   try {
     const { status } = req.body;
 
-    // Validate status
+    // ✅ Validate input
     const validStatuses = ['online', 'offline', 'busy', 'away'];
     if (!validStatuses.includes(status)) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Invalid status. Must be: online, offline, busy, or away' 
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid status. Must be: online, offline, busy, or away',
       });
     }
 
-    // Update user status
+    // ✅ Update status and last seen
     const user = await User.findByIdAndUpdate(
       req.user._id,
-      { 
+      {
         status,
-        lastSeen: Date.now()
+        lastSeen: Date.now(),
       },
       { new: true }
-    ).select('-password');
+    ).select('-password'); // exclude sensitive data
 
     res.json({
       success: true,
       message: 'Status updated successfully',
-      user
+      user,
     });
   } catch (error) {
-    console.error('Status update error:', error);
-    res.status(500).json({ 
-      success: false, 
-      message: 'Error updating status' 
+    console.error('❌ Status update error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error updating status',
     });
   }
 });
 
-// @desc    Get user status
+// ===========================================
+// @desc    Get specific user status
 // @route   GET /api/status/:userId
+// ===========================================
 router.get('/:userId', authMiddleware, async (req, res) => {
   try {
     const user = await User.findById(req.params.userId).select('status lastSeen name');
 
     if (!user) {
-      return res.status(404).json({ 
-        success: false, 
-        message: 'User not found' 
+      return res.status(404).json({
+        success: false,
+        message: 'User not found',
       });
     }
 
@@ -61,20 +65,22 @@ router.get('/:userId', authMiddleware, async (req, res) => {
         userId: user._id,
         name: user.name,
         status: user.status,
-        lastSeen: user.lastSeen
-      }
+        lastSeen: user.lastSeen,
+      },
     });
   } catch (error) {
-    console.error('Get status error:', error);
-    res.status(500).json({ 
-      success: false, 
-      message: 'Error fetching status' 
+    console.error('❌ Get status error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching status',
     });
   }
 });
 
-// @desc    Get all users status (for status page)
+// ===========================================
+// @desc    Get all users' statuses
 // @route   GET /api/status
+// ===========================================
 router.get('/', authMiddleware, async (req, res) => {
   try {
     const users = await User.find().select('name status lastSeen icon isGroup');
@@ -85,19 +91,19 @@ router.get('/', authMiddleware, async (req, res) => {
       status: user.status,
       lastSeen: user.lastSeen,
       icon: user.icon,
-      isGroup: user.isGroup
+      isGroup: user.isGroup,
     }));
 
     res.json({
       success: true,
       count: statusList.length,
-      statuses: statusList
+      statuses: statusList,
     });
   } catch (error) {
-    console.error('Get all status error:', error);
-    res.status(500).json({ 
-      success: false, 
-      message: 'Error fetching statuses' 
+    console.error('❌ Get all statuses error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching statuses',
     });
   }
 });
