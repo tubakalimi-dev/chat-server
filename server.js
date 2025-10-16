@@ -7,6 +7,7 @@ require('dotenv').config();
 
 const app = express();
 
+
 // Middleware
 app.use(cors());
 app.use(express.json());
@@ -23,6 +24,12 @@ mongoose.connect(process.env.MONGO_URI)
 const authRoutes = require('./routes/auth');
 const statusRoutes = require('./routes/status');
 const adminRoutes = require('./routes/admin'); // or wherever you put the code above
+const path = require('path');
+const statusRoutes = require('./routes/statusRoutes');
+
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+app.use('/api/status', statusRoutes);
+
 
 // Register the routes (add this with your other routes)
 app.use('/api/admin', adminRoutes);
