@@ -43,7 +43,7 @@ app.get('/', (req, res) => {
   res.json({
     status: 'Server is running',
     timestamp: new Date().toISOString(),
-    connectedUsers: Array.from(connectedUsers.values())
+    connectedUsers: connectedUsers.size
   });
 });
 
@@ -61,178 +61,76 @@ const io = socketIo(server, {
 });
 
 // ===== Store Connected Users =====
-// Structure: { userId: { socketId, name, email, lastSeen, status } }
 const connectedUsers = new Map();
-
-// ===== Helper: Broadcast online users list =====
-const broadcastUsersList = () => {
-  const usersList = Array.from(connectedUsers.values()).map(user => ({
-    userId: user.userId,
-    name: user.name,
-    email: user.email,
-    status: 'online',
-    lastSeen: new Date().toISOString()
-  }));
-  
-  io.emit('users_list_updated', {
-    onlineUsers: usersList,
-    count: usersList.length,
-    timestamp: new Date().toISOString()
-  });
-};
 
 // ===== Socket.IO Handlers =====
 io.on('connection', (socket) => {
   console.log('✅ New user connected:', socket.id);
 
   // When a user signs in
-  socket.on('signin', (userData) => {
-    const userId = userData.userId || userData;
-    const name = userData.name || 'User';
-    const email = userData.email || '';
-
+  socket.on('signin', (userId) => {
     socket.userId = userId;
-    connectedUsers.set(userId, {
-      userId,
-      socketId: socket.id,
-      name,
-      email,
-      status: 'online',
-      lastSeen: new Date().toISOString()
-    });
-
-    console.log('📝 User signed in:', userId, name);
+    connectedUsers.set(userId, socket.id);
+    console.log('📝 User signed in:', userId);
     console.log('👥 Total users:', connectedUsers.size);
-
-    // Notify this user that they're connected
-    socket.emit('signin_success', {
-      success: true,
+    io.emit('user_status_change', {
       userId,
-      message: 'Signed in successfully'
+      status: 'online',
+      timestamp: new Date().toISOString()
     });
-
-    // Broadcast updated users list to all clients
-    broadcastUsersList();
   });
 
   // When a message is sent
   socket.on('send_message', (data) => {
-    const { sender, senderName, receiverId, content, messageId, timestamp, roomId } = data;
-
     console.log('📨 Message received:', {
-      from: sender,
-      fromName: senderName,
-      to: receiverId,
-      content: content.substring(0, 50),
-      time: timestamp
+      from: data.sender,
+      to: data.room,
+      content: data.content,
+      time: data.time
     });
-
-    // Get receiver's socket
-    const receiverData = connectedUsers.get(receiverId);
-
-    if (receiverData) {
-      // Send to specific receiver only
-      io.to(receiverData.socketId).emit('receive_message', {
-        sender,
-        senderName: senderName || 'User',
-        receiverId,
-        content,
-        messageId,
-        timestamp: timestamp || new Date().toISOString(),
-        roomId
-      });
-
-      console.log('✅ Message sent to receiver:', receiverId);
-    } else {
-      // Receiver is offline - optionally store message for later
-      console.log('⚠️ Receiver offline:', receiverId);
-      
-      // Notify sender that receiver is offline
-      socket.emit('receiver_offline', {
-        receiverId,
-        message: 'Receiver is offline. Message not delivered.'
-      });
-    }
-
-    // Also send confirmation back to sender
-    socket.emit('message_sent', {
-      messageId,
-      timestamp: new Date().toISOString(),
-      success: true
+    io.emit('receive_message', {
+      content: data.content,
+      message: data.content,
+      sender: data.sender,
+      time: data.time,
+      messageId: data.messageId
     });
+    console.log('✅ Message broadcasted');
   });
 
   // Typing events
   socket.on('typing', (data) => {
-    const { receiverId } = data;
-    const receiver = connectedUsers.get(receiverId);
-
-    if (receiver) {
-      io.to(receiver.socketId).emit('user_typing', {
-        userId: socket.userId,
-        isTyping: true,
-        timestamp: new Date().toISOString()
-      });
-    }
+    socket.broadcast.emit('user_typing', {
+      userId: socket.userId || data.userId,
+      isTyping: true
+    });
   });
 
   socket.on('stop_typing', (data) => {
-    const { receiverId } = data;
-    const receiver = connectedUsers.get(receiverId);
-
-    if (receiver) {
-      io.to(receiver.socketId).emit('user_typing', {
-        userId: socket.userId,
-        isTyping: false,
-        timestamp: new Date().toISOString()
-      });
-    }
+    socket.broadcast.emit('user_typing', {
+      userId: socket.userId || data.userId,
+      isTyping: false
+    });
   });
 
   // Manual status change
   socket.on('status_change', (data) => {
-    const { newStatus } = data;
-    
-    if (socket.userId && connectedUsers.has(socket.userId)) {
-      const userData = connectedUsers.get(socket.userId);
-      userData.status = newStatus;
-      connectedUsers.set(socket.userId, userData);
-    }
-
-    broadcastUsersList();
-  });
-
-  // Request current users list
-  socket.on('get_users_list', () => {
-    const usersList = Array.from(connectedUsers.values()).map(user => ({
-      userId: user.userId,
-      name: user.name,
-      email: user.email,
-      status: 'online'
-    }));
-
-    socket.emit('users_list', {
-      onlineUsers: usersList,
-      count: usersList.length
+    io.emit('user_status_change', {
+      userId: data.userId,
+      status: data.status,
+      timestamp: new Date().toISOString()
     });
   });
 
   // Handle user disconnect
   socket.on('disconnect', () => {
     if (socket.userId) {
-      const userData = connectedUsers.get(socket.userId);
       connectedUsers.delete(socket.userId);
-      
       console.log('❌ User disconnected:', socket.userId);
       console.log('👥 Remaining users:', connectedUsers.size);
-
-      // Broadcast updated users list
-      broadcastUsersList();
-
-      // Notify others that user went offline
-      io.emit('user_offline', {
+      io.emit('user_status_change', {
         userId: socket.userId,
-        userName: userData?.name,
+        status: 'offline',
         timestamp: new Date().toISOString()
       });
     }
@@ -265,4 +163,3 @@ process.on('SIGTERM', () => {
     process.exit(0);
   });
 });
-
