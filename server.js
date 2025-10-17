@@ -10,7 +10,7 @@ require('dotenv').config();
 
 const app = express();
 
-// Create uploads folder if it doesn't exist
+// Create uploads folder if missing
 const uploadDir = 'uploads';
 if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir);
@@ -33,7 +33,7 @@ mongoose.connect(process.env.MONGO_URI)
     process.exit(1);
   });
 
-// MongoDB Models
+// Mongoose Status model
 const StatusSchema = new mongoose.Schema({
   userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   mediaUrl: { type: String, required: true },
@@ -61,12 +61,12 @@ app.get('/', (req, res) => {
   res.json({ status: 'Server running', timestamp: new Date().toISOString() });
 });
 
-// Fetch all current (non-expired) statuses
+// Get all current statuses
 app.get('/api/status/upload/all', async (req, res) => {
   try {
     const now = new Date();
     const statuses = await Status.find({ expiresAt: { $gt: now } })
-      .populate('userId', 'name email icon')
+      .populate('userId', 'name email')
       .sort({ createdAt: -1 });
 
     res.json({
@@ -77,7 +77,6 @@ app.get('/api/status/upload/all', async (req, res) => {
         userId: s.userId._id,
         userName: s.userId.name,
         userEmail: s.userId.email,
-        userIcon: s.userId.icon,
         mediaUrl: s.mediaUrl,
         mediaType: s.mediaType,
         createdAt: s.createdAt,
@@ -87,12 +86,12 @@ app.get('/api/status/upload/all', async (req, res) => {
       }))
     });
   } catch (err) {
-    console.error('Error fetching statuses:', err);
+    console.error('Fetch statuses error:', err);
     res.status(500).json({ success: false, message: 'Error fetching statuses' });
   }
 });
 
-// Upload status media
+// Upload a new status (image/video)
 app.post('/api/status/upload', upload.single('media'), async (req, res) => {
   try {
     if (!req.file) {
@@ -100,13 +99,18 @@ app.post('/api/status/upload', upload.single('media'), async (req, res) => {
     }
 
     const mediaType = req.file.mimetype.startsWith('video') ? 'video' : 'image';
+    const userId = req.body.userId;
+
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      return res.status(400).json({ success: false, message: 'Invalid user id' });
+    }
 
     const newStatus = await Status.create({
-      userId: mongoose.Types.ObjectId(req.body.userId), // Expect userId in body
+      userId,
       mediaUrl: `/uploads/${req.file.filename}`,
       mediaType,
       createdAt: new Date(),
-      expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000) // 24 hours expiry
+      expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000)  // Expires in 24 hours
     });
 
     res.json({
@@ -119,18 +123,17 @@ app.post('/api/status/upload', upload.single('media'), async (req, res) => {
     if (req.file) {
       fs.unlink(path.join(uploadDir, req.file.filename), () => {});
     }
-    res.status(500).json({ success: false, message: err.message || 'Upload failed' });
+    res.status(500).json({ success: false, message: 'Error uploading status' });
   }
 });
 
-// Create HTTP server and Socket.IO
+// Socket.IO setup
 const server = http.createServer(app);
 const io = socketIo(server, {
   cors: { origin: '*', methods: ['GET', 'POST'] },
   transports: ['websocket', 'polling']
 });
 
-// Simple in-memory connected users map
 const connectedUsers = new Map();
 
 io.on('connection', (socket) => {
@@ -139,50 +142,29 @@ io.on('connection', (socket) => {
   socket.on('signin', (userId) => {
     socket.userId = userId;
     connectedUsers.set(userId, socket.id);
-    console.log('📝 User signed in:', userId);
     io.emit('user_status_change', { userId, status: 'online', timestamp: new Date().toISOString() });
   });
 
   socket.on('send_message', (data) => {
-    io.emit('receive_message', {
-      content: data.content,
-      sender: data.sender,
-      messageId: data.messageId,
-      time: data.time,
-      room: data.room,
-    });
+    io.emit('receive_message', data);
   });
 
   socket.on('typing', (data) => {
-    socket.broadcast.emit('user_typing', {
-      userId: socket.userId || data.userId,
-      isTyping: true,
-    });
+    socket.broadcast.emit('user_typing', { userId: socket.userId || data.userId, isTyping: true });
   });
 
   socket.on('stop_typing', (data) => {
-    socket.broadcast.emit('user_typing', {
-      userId: socket.userId || data.userId,
-      isTyping: false,
-    });
+    socket.broadcast.emit('user_typing', { userId: socket.userId || data.userId, isTyping: false });
   });
 
   socket.on('status_change', (data) => {
-    io.emit('user_status_change', {
-      userId: data.userId,
-      status: data.status,
-      timestamp: new Date().toISOString(),
-    });
+    io.emit('user_status_change', { userId: data.userId, status: data.status, timestamp: new Date().toISOString() });
   });
 
   socket.on('disconnect', () => {
     if (socket.userId) {
       connectedUsers.delete(socket.userId);
-      io.emit('user_status_change', {
-        userId: socket.userId,
-        status: 'offline',
-        timestamp: new Date().toISOString(),
-      });
+      io.emit('user_status_change', { userId: socket.userId, status: 'offline', timestamp: new Date().toISOString() });
     }
   });
 });
