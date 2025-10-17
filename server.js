@@ -32,14 +32,10 @@ mongoose.connect(process.env.MONGO_URI)
 
 // ===== Import Routes =====
 const authRoutes = require('./routes/auth');
-const statusRoutes = require('./routes/status');
-const statusUploadRoutes = require('./routes/statusroute');
 const adminRoutes = require('./routes/admin');
 
 // ===== Register Routes =====
 app.use('/api/auth', authRoutes);
-app.use('/api/statusupload', statusUploadRoutes);
-app.use('/api/status', statusRoutes);
 app.use('/api/admin', adminRoutes);
 
 // ===== Health Check Endpoint =====
@@ -168,7 +164,7 @@ io.on('connection', (socket) => {
 
   // Typing events
   socket.on('typing', (data) => {
-    const { receiverId, typingStatus } = data;
+    const { receiverId } = data;
     const receiver = connectedUsers.get(receiverId);
 
     if (receiver) {
@@ -269,3 +265,4 @@ process.on('SIGTERM', () => {
     process.exit(0);
   });
 });
+
