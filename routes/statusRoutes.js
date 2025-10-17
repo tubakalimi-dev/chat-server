@@ -54,7 +54,7 @@ const upload = multer({
 
 // ===== POST /api/status/upload =====
 // Upload a new photo/video status
-router.post('/', auth, upload.single('media'), async (req, res) => {
+router.post('/upload', auth, upload.single('media'), async (req, res) => {
   try {
     // Check if file was uploaded
     if (!req.file) {

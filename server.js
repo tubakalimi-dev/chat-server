@@ -38,8 +38,8 @@ const adminRoutes = require('./routes/admin');
 
 // ===== Register Routes =====
 app.use('/api/auth', authRoutes);
-app.use('/api/status/upload', statusUploadRoutes);
-app.use('/api/status', statusRoutes);
+app.use('/api/statusupload', statusUploadRoutes);  // Separate path for uploads
+app.use('/api/status', statusRoutes);              // Online/offline status
 app.use('/api/admin', adminRoutes);
 
 // ===== Health Check Endpoint =====
