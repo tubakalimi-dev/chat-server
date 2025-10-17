@@ -39,13 +39,16 @@ app.use('/api/auth', authRoutes);
 app.use('/api/admin', adminRoutes);
 
 // ===== Health Check Endpoint =====
-app.get('/', (req, res) => {
-  res.json({
-    status: 'Server is running',
-    timestamp: new Date().toISOString(),
-    connectedUsers: connectedUsers.size
-  });
+app.get('/api/users', async (req, res) => {
+  try {
+    const users = await mongoose.connection.db.collection('users').find().toArray();
+    res.json({ success: true, count: users.length, users });
+  } catch (err) {
+    console.error('Error fetching users:', err);
+    res.status(500).json({ success: false, message: 'Database fetch failed' });
+  }
 });
+
 
 // ===== Create HTTP Server =====
 const server = http.createServer(app);
