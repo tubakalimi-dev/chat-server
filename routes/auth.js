@@ -1,18 +1,10 @@
 const express = require('express');
 const router = express.Router();
-const authController = require('../controllers/authController');
-const authMiddleware = require('../middleware/auth');
-const adminMiddleware = require('../routes/admin');
 
-// Public routes
-router.post('/register', authController.register);
-router.post('/login', authController.login);
-
-// Protected routes (require authentication)
-router.get('/me', authMiddleware, authController.getMe);
-router.post('/logout', authMiddleware, authController.logout);
-
-// Admin only routes
-router.get('/users', authMiddleware, adminMiddleware, authController.getAllUsers);
+router.post('/login', (req, res) => {
+  // Dummy login response
+  res.json({ success: true, message: 'Login success', userId: '12345' });
+});
 
 module.exports = router;
+
